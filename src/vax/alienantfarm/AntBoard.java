@@ -15,8 +15,8 @@ public class AntBoard {
     protected boolean block;
     protected double phero_fresh, phero_old;
 
-    public Color getColor() {
-      return block ? Color.BLACK : new Color( 0, (float) phero_old, (float) phero_fresh );
+    public int getColor() {
+      return block ? Color.BLACK.getRGB() : new Color( 0, (float) phero_old, (float) phero_fresh ).getRGB();
     }
   }
 
@@ -55,9 +55,8 @@ public class AntBoard {
 
     @Override
     public String toString() {
-      return "AGI " + agility + " SME " + smell + " TAS " + taste + " AGG " + aggro + " CHA " + chaos + " PHE " + phero;
+      return "AGI " + agility + "\nSME " + smell + "\nTAS " + taste + "\nAGG " + aggro + "\nCHA " + chaos + "\nPHE " + phero;
     }
-
 
   }
 
@@ -155,7 +154,7 @@ public class AntBoard {
   }
 
   public void add_phero( ant a ) {
-    int dx, dy, x_min, y_min;
+    int dx, dy_start, x_min, y_min;
 
     if ( a.pos_x < PHERO_SPREAD_RADIUS ) {
       x_min = 0;
@@ -166,10 +165,10 @@ public class AntBoard {
     }
     if ( a.pos_y < PHERO_SPREAD_RADIUS ) {
       y_min = 0;
-      dy = a.pos_y;
+      dy_start = a.pos_y;
     } else {
       y_min = a.pos_y - PHERO_SPREAD_RADIUS;
-      dy = PHERO_SPREAD_RADIUS;
+      dy_start = PHERO_SPREAD_RADIUS;
     }
     int x_max = a.pos_x + PHERO_SPREAD_RADIUS,
             y_max = a.pos_y + PHERO_SPREAD_RADIUS;
@@ -180,11 +179,13 @@ public class AntBoard {
 
     for( int i_x = x_min; i_x <= x_max; i_x++, dx-- ) {
       double dx_sq = dx * dx;
-      for( int i_y = y_min; i_y <= y_max; i_y++, dy-- ) {
+      for( int i_y = y_min, dy = dy_start; i_y <= y_max; i_y++, dy-- ) {
         double dist_sq = dx_sq + dy * dy;
-        if ( dist_sq > PHERO_SPREAD_RADIUS_SQ )
+        if ( dist_sq >= PHERO_SPREAD_RADIUS_SQ )
           continue;
         field f = board[i_x][i_y];
+        if ( f.block )
+          continue;
         f.phero_fresh += a.my_genome.phero.epsilon( 1 - Math.sqrt( dist_sq ) * PHERO_SPREAD_RADIUS_INV ) * ( 1 - f.phero_fresh );
       }
     }
@@ -199,22 +200,31 @@ public class AntBoard {
   }
 
   @SuppressWarnings( "empty-statement" )
+  protected int iteration( genome g, int angle ) {
+    ant a = new ant( g, angle, start_x, start_y );
+    while( a.step() );
+    age_phero( a.age );
+    return a.age;
+  }
+
+  @SuppressWarnings( "empty-statement" )
   public int run_iterations( int count, genome g ) {
     int angle = 0; // var
     int angle2 = ( angle + 8 ) % ANGLE_STEPS;
     int it_total = 0;
-    ant a;
-    for( int i = 0; i < count; i++ ) {
-      a = new ant( g, angle, start_x, start_y );
-      while( a.step() );
+    ant a = new ant( g, angle, start_x, start_y );
+    while( a.step() );
+    best_time = a.age;
+    age_phero( a.age );
+    it_total += a.age;
+    reverse_path();
+    it_total += iteration( g, angle2 );
+    reverse_path();
+    for( int i = 1; i < count; i++ ) {
+      it_total += iteration( g, angle );
       reverse_path();
-      it_total += a.age;
-      age_phero( a.age );
-      a = new ant( g, angle2, start_x, start_y );
-      while( a.step() );
+      it_total += iteration( g, angle2 );
       reverse_path();
-      it_total += a.age;
-      age_phero( a.age );
     }
     return it_total;
   }
