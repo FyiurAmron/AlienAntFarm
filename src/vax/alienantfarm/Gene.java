@@ -39,7 +39,8 @@ public class Gene implements FunctionalGene {
   }
 
   static protected double clamp( double d ) {
-    return util.clamp( d, GENE_MIN, GENE_MAX );
+    //return util.clamp( d, GENE_MIN, GENE_MAX );
+    return d;
   }
 
   public Gene( double base, double twist ) {
