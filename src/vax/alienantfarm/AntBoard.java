@@ -16,10 +16,10 @@ import static vax.alienantfarm.util.in_range;
 public class AntBoard {
 //
   static public class genome {
-    protected Gene agility, smell, taste, aggro, chaos, phero;
+    protected Gene focus, smell, taste, aggro, chaos, phero;
 
     public genome() {
-      this.agility = new Gene();
+      this.focus = new Gene();
       this.smell = new Gene();
       this.taste = new Gene();
       this.aggro = new Gene();
@@ -27,8 +27,8 @@ public class AntBoard {
       this.phero = new Gene();
     }
 
-    public genome( Gene agility, Gene smell, Gene taste, Gene aggro, Gene chaos, Gene phero ) {
-      this.agility = agility;
+    public genome( Gene focus, Gene smell, Gene taste, Gene aggro, Gene chaos, Gene phero ) {
+      this.focus = focus;
       this.smell = smell;
       this.taste = taste;
       this.aggro = aggro;
@@ -36,8 +36,22 @@ public class AntBoard {
       this.phero = phero;
     }
 
+    public genome( genome g ) {
+      this.focus = new Gene( g.focus );
+      this.smell = new Gene( g.smell );
+      this.taste = new Gene( g.taste );
+      this.aggro = new Gene( g.aggro );
+      this.chaos = new Gene( g.chaos );
+      this.phero = new Gene( g.phero );
+    }
+    /*
+     public genome( genome g, boolean single_mut ) {
+
+     }
+     */
+
     public genome( genome g1, genome g2 ) {
-      this.agility = new Gene( g1.agility, g2.agility );
+      this.focus = new Gene( g1.focus, g2.focus );
       this.smell = new Gene( g1.smell, g2.smell );
       this.taste = new Gene( g1.taste, g2.taste );
       this.aggro = new Gene( g1.aggro, g2.aggro );
@@ -76,8 +90,8 @@ public class AntBoard {
         while( is.read() != '\n' );
         Gene g = new Gene( d1, d2 );
         switch ( new String( char_buf ) ) {
-          case "AGI":
-            agility = g;
+          case "FOC":
+            focus = g;
             break;
           case "SME":
             smell = g;
@@ -106,7 +120,7 @@ public class AntBoard {
 
     @Override
     public String toString() {
-      return "AGI " + agility + "\nSME " + smell + "\nTAS " + taste + "\nAGG " + aggro + "\nCHA " + chaos + "\nPHE " + phero + "\n";
+      return "FOC " + focus + "\nSME " + smell + "\nTAS " + taste + "\nAGG " + aggro + "\nCHA " + chaos + "\nPHE " + phero + "\n";
     }
 
   }
@@ -181,7 +195,9 @@ public class AntBoard {
   final protected HashSet<ant> ants = new HashSet<>(); // currently unused
   protected int start_x, start_y;
   protected int exit_x, exit_y;
-  protected int best_time = Integer.MAX_VALUE;
+  protected long time_sum;
+  protected int time_sum_count;
+  //protected int best_time = Integer.MAX_VALUE;
 
   public AntBoard( proto p, AntObserver ao ) {
     board_proto = p;
@@ -196,19 +212,73 @@ public class AntBoard {
     board_proto.set_block( x_min, y_min, x_max, y_max, value );
   }
 
-  public void age_phero( int time ) {
-    double time_factor = (double) best_time / time;
-    if ( time < best_time )
-      best_time = time;
+  public void init_phero( int time ) {
+    time_sum = time;
+    time_sum_count = 1;
+    //time_factor *= time_factor;
     for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+      @SuppressWarnings( { "MismatchedReadAndWriteOfArray", "UnusedAssignment" } )
       double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
       for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
-        pho_x[y] = ( pho_x[y] * constant.PHERO_DISP_RATE + time_factor * phf_x[y] );
-        if ( pho_x[y] > 1 ) // clamp
-          pho_x[y] = 1;
+        pho_x[y] = phf_x[y];
         phf_x[y] = 0;
       }
     }
+  }
+
+  @SuppressWarnings( { "MismatchedReadAndWriteOfArray", "UnusedAssignment" } )
+  public void age_phero( ant a ) {
+    double time = a.age, time_ratio = time / time_sum * time_sum_count;
+    double time_factor = -Math.log( time_ratio ) + 1;
+    System.out.println( time_factor );
+    //time_factor *= time_factor; // add gene here?
+    if ( time_ratio < 1 ) {
+      time_sum += time;
+      time_sum_count++;
+    }
+
+    if ( time_factor < TIME_AMP_THRESHOLD ) { // only apply dispersion
+      for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+        double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
+        for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
+          pho_x[y] *= constant.PHERO_DISP_RATE;
+          phf_x[y] = 0;
+        }
+      }
+      return;
+    }
+    if ( time_factor < 0 ) {
+      time_factor = ( time_factor < -1 ) ? ( 1.0 - E_INV ) : 1.0 + time_factor * E_INV;
+      for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+        double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
+        for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
+          pho_x[y] *= constant.PHERO_DISP_RATE * time_factor;
+          phf_x[y] = 0;
+        }
+      }
+      return;
+    }
+    double phero_base = a.my_genome.phero.base, phero_a = 1.0 + 1.0 / ( phero_base - 1 );
+    if ( time_factor > 1 ) {
+      for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+        double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
+        for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
+          pho_x[y] = pho_x[y] * constant.PHERO_DISP_RATE
+                  + time_factor * ( ( phf_x[y] <= phero_base ) ? phf_x[y] : phero_a * ( phf_x[y] - 1 ) ) * ( 1 - pho_x[y] );
+          if ( pho_x[y] > 1 ) // clamp
+            pho_x[y] = 1;
+          phf_x[y] = 0;
+        }
+      }
+    } else // time_factor in (TIME_AMP_THRESHOLD,1), no clamping needed
+      for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+        double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
+        for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
+          pho_x[y] = pho_x[y] * constant.PHERO_DISP_RATE
+                  + time_factor * ( ( phf_x[y] <= phero_base ) ? phf_x[y] : phero_a * ( phf_x[y] - 1 ) ) * ( 1 - pho_x[y] );
+          phf_x[y] = 0;
+        }
+      }
   }
 
   public void add_phero( ant a ) {
@@ -250,7 +320,7 @@ public class AntBoard {
   }
 
   public int get_color( int x, int y ) {
-    return board_proto.block[x][y] ? Color.BLACK.getRGB() : new Color( 0, (float) phero_old[x][y], (float) phero_fresh[x][y] ).getRGB();
+    return board_proto.block[x][y] ? Color.WHITE.getRGB() : new Color( 0, (float) phero_old[x][y], (float) phero_fresh[x][y] ).getRGB();
   }
 
   protected void reverse_path() {
@@ -265,7 +335,7 @@ public class AntBoard {
   protected int iteration( genome g, int angle ) {
     ant a = new ant( g, angle, start_x, start_y );
     while( a.step() );
-    age_phero( a.age );
+    age_phero( a );
     return a.age;
   }
 
@@ -275,13 +345,12 @@ public class AntBoard {
     start_y = board_proto.start_y;
     exit_x = board_proto.exit_x;
     exit_y = board_proto.exit_y;
-    int angle = 0; // var
+    int angle = RNG.nextInt( ANGLE_STEPS );
     int angle2 = ( angle + 8 ) % ANGLE_STEPS;
     int it_total = 0;
     ant a = new ant( g, angle, start_x, start_y );
     while( a.step() );
-    best_time = a.age;
-    age_phero( a.age );
+    init_phero( a.age );
     it_total += a.age;
     reverse_path();
     it_total += iteration( g, angle2 );
@@ -337,8 +406,8 @@ public class AntBoard {
         double dx = exit_x - x, dy = exit_y - y;
         double dist = util.dist( dx, dy );
         if ( dist <= DIST_THRESHOLD ) {
-          pos_x += x_ang;
-          pos_y += y_ang;
+          pos_x = exit_x;
+          pos_y = exit_y;
           angle = i;
           add_phero( this );
           age++;
@@ -358,8 +427,10 @@ public class AntBoard {
                 + my_genome.smell.epsilon( 1.0 - PI_INV * Math.acos( cos_alpha ) )
                 + my_genome.taste.epsilon( phero_old[x][y] )
                 - my_genome.aggro.epsilon( phero_fresh[x][y] )
-                - my_genome.agility.epsilon( ANGLE_RATE[i_ang] );
+                - my_genome.focus.epsilon( ANGLE_RATE[i_ang] );
 
+        //if ( base_weight != base_weight )
+        //  throw new AntException( "base_weight is NaN!" );
         values[i] = ( base_weight < RELATIVELY_BLOCKED_WEIGHT ) ? RELATIVELY_BLOCKED_WEIGHT : base_weight;
         sum_value += values[i];
       }
@@ -371,6 +442,8 @@ public class AntBoard {
         pick -= values[i];
       pos_x += ANGLES[i][0];
       pos_y += ANGLES[i][1];
+      //if ( pos_x >= size_x || pos_y >= size_y )
+      //  throw new AntException( "??? out of range..." );
       angle = i;
       add_phero( this );
       age++;

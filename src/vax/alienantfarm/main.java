@@ -1,7 +1,5 @@
 package vax.alienantfarm;
 
-import java.io.IOException;
-
 /**
 
  @author toor
@@ -9,11 +7,10 @@ import java.io.IOException;
 public class main {
   /**
    @param args the command line arguments
+   @throws java.lang.Exception
    */
   public static void main( String[] args ) throws Exception {
-    //Test.test1();
-    //Test.test2();
-    Test.test3();
+    Test.test();
   }
 
 }
