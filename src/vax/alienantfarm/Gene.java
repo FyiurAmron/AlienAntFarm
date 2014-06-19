@@ -8,7 +8,7 @@ import static vax.alienantfarm.constant.*;
 
  @author toor
  */
-public class Gene {
+public class Gene implements FunctionalGene {
   final static protected Random RNG = new Random();
   final static public Gene //
           NULL_GENE = new Gene( 0, 0 ) {
@@ -35,7 +35,7 @@ public class Gene {
 
   static protected double mix( double d1, double d2 ) {
     double rd = rndMix();
-    return rd * d1 + ( 1 - rd ) * d2 + rndMut();
+    return rd * d1 + ( 1 - rd ) * d2;
   }
 
   static protected double clamp( double d ) {
@@ -46,6 +46,10 @@ public class Gene {
     this.base = clamp( base );
     this.twist = clamp( twist );
     twist_factor = twist * twist + 0.5 * twist + 0.5; // 0.0/0.5/1.0 -> 0.5/1.0/2.0 range
+  }
+
+  public Gene( Gene g ) {
+    this( g.base + rndMut(), g.twist + rndMut() );
   }
 
   public Gene( Gene g1, Gene g2 ) {
@@ -64,6 +68,7 @@ public class Gene {
     return twist_factor;
   }
 
+  @Override
   public double epsilon( double x ) {
     return base * Math.pow( x, twist_factor );
     //return base * util.fast_pow( x, twist_factor );
@@ -73,6 +78,5 @@ public class Gene {
   public String toString() {
     return "(" + base + "," + twist + ")";
   }
-
 
 }
