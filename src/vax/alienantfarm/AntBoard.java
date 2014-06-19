@@ -237,7 +237,7 @@ public class AntBoard {
       time_sum_count++;
     }
 
-    if ( time_factor < TIME_AMP_THRESHOLD ) { // only apply dispersion
+    if ( Math.abs(time_factor) < TIME_AMP_THRESHOLD ) { // only apply dispersion
       for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
         double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
         for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
