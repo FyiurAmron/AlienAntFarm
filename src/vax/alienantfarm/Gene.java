@@ -66,6 +66,7 @@ public class Gene {
 
   public double epsilon( double x ) {
     return base * Math.pow( x, twist_factor );
+    //return base * util.fast_pow( x, twist_factor );
   }
 
   @Override

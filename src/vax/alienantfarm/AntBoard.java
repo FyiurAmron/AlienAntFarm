@@ -1,8 +1,11 @@
 package vax.alienantfarm;
 
-import java.awt.Color;
 import java.util.HashSet;
 import java.util.Random;
+import java.io.IOException;
+import java.io.InputStream;
+import java.awt.Color;
+
 import static vax.alienantfarm.constant.*;
 import static vax.alienantfarm.util.in_range;
 
@@ -11,20 +14,9 @@ import static vax.alienantfarm.util.in_range;
  @author toor
  */
 public class AntBoard {
-  static protected class field {
-    protected boolean block;
-    protected double phero_fresh, phero_old;
-
-    public int getColor() {
-      return block ? Color.BLACK.getRGB() : new Color( 0, (float) phero_old, (float) phero_fresh ).getRGB();
-    }
-  }
-
-  /**
-   Immutable. Create new instance if a derived genome is needed.
-   */
+//
   static public class genome {
-    final protected Gene agility, smell, taste, aggro, chaos, phero;
+    protected Gene agility, smell, taste, aggro, chaos, phero;
 
     public genome() {
       this.agility = new Gene();
@@ -53,9 +45,92 @@ public class AntBoard {
       this.phero = new Gene( g1.phero, g2.phero );
     }
 
+    final static int MAX_LINE_LEN = 1024, TYPE_LEN = 3;
+
+    @SuppressWarnings( "empty-statement" )
+    public genome( InputStream is ) throws IOException {
+      double d1, d2;
+      int in;
+      char[] char_buf = new char[3];
+      while( true ) {
+        while( true ) {
+          in = is.read();
+          if ( in == '#' ) {
+            while( is.read() != '\n' );
+            continue;
+          } else if ( Character.isWhitespace( in ) )
+            continue;
+          else if ( in == '^' )
+            return;
+          else if ( in == -1 )
+            throw new IOException( "EOF while data expected!" );
+          char_buf[0] = (char) in;
+          char_buf[1] = (char) is.read();
+          char_buf[2] = (char) is.read();
+          break;
+        }
+        while( is.read() != '(' );
+        d1 = util.get_double( is );
+        //while( br.read() != ',' ); // already read by get_double()
+        d2 = util.get_double( is );
+        while( is.read() != '\n' );
+        Gene g = new Gene( d1, d2 );
+        switch ( new String( char_buf ) ) {
+          case "AGI":
+            agility = g;
+            break;
+          case "SME":
+            smell = g;
+            break;
+          case "TAS":
+            taste = g;
+            break;
+          case "AGG":
+            aggro = g;
+            break;
+          case "CHA":
+            chaos = g;
+            break;
+          case "PHE":
+            phero = g;
+            break;
+          default:
+            throw new AntException( "unknown ant gene '" + new String( char_buf ) + "'" );
+        }
+      }
+    }
+
+    public String toOutputString() {
+      return toString() + "^\n";
+    }
+
     @Override
     public String toString() {
-      return "AGI " + agility + "\nSME " + smell + "\nTAS " + taste + "\nAGG " + aggro + "\nCHA " + chaos + "\nPHE " + phero;
+      return "AGI " + agility + "\nSME " + smell + "\nTAS " + taste + "\nAGG " + aggro + "\nCHA " + chaos + "\nPHE " + phero + "\n";
+    }
+
+  }
+
+  static public class proto {
+    protected int size_x, size_y;
+    protected int start_x, start_y;
+    protected int exit_x, exit_y;
+    final protected boolean[][] block;
+
+    public proto( int size_x, int size_y, int start_x, int start_y, int exit_x, int exit_y ) {
+      this.size_x = size_x;
+      this.size_y = size_y;
+      this.start_x = start_x;
+      this.start_y = start_y;
+      this.exit_x = exit_x;
+      this.exit_y = exit_y;
+      block = new boolean[size_x][size_y];
+    }
+
+    public void set_block( int x_min, int y_min, int x_max, int y_max, boolean value ) {
+      for( int x = x_min; x <= x_max; x++ )
+        for( int y = y_min; y <= y_max; y++ )
+          block[x][y] = value;
     }
 
   }
@@ -99,58 +174,41 @@ public class AntBoard {
       ANGLE_RATE[i] = rate;
   }
 //
-  protected HashSet<ant> ants = new HashSet<>();
-  protected AntObserver ao;
-  protected int size_x, size_y;
+  final protected proto board_proto;
+  final protected double[][] phero_fresh, phero_old;
+  final protected int size_x, size_y;
+  final protected AntObserver ao;
+  final protected HashSet<ant> ants = new HashSet<>(); // currently unused
   protected int start_x, start_y;
   protected int exit_x, exit_y;
   protected int best_time = Integer.MAX_VALUE;
-  protected field[][] board;
 
-  public AntBoard( int size_x, int size_y, int start_x, int start_y, int exit_x, int exit_y, AntObserver ao ) {
-    this.size_x = size_x;
-    this.size_y = size_y;
-    this.start_x = start_x;
-    this.start_y = start_y;
-    this.exit_x = exit_x;
-    this.exit_y = exit_y;
+  public AntBoard( proto p, AntObserver ao ) {
+    board_proto = p;
+    size_x = p.size_x;
+    size_y = p.size_y;
+    phero_fresh = new double[size_x][size_y];
+    phero_old = new double[size_x][size_y];
     this.ao = ao;
-    board = new field[size_x][size_y];
-    for( field[] fs : board )
-      for( int i = 0, max = fs.length; i < max; i++ )
-        fs[i] = new field();
   }
 
   public void set_block( int x_min, int y_min, int x_max, int y_max, boolean value ) {
-    for( int x = x_min; x <= x_max; x++ )
-      for( int y = y_min; y <= y_max; y++ )
-        board[x][y].block = value;
-  }
-
-  public boolean is_blocked( int x, int y ) {
-    return board[x][y].block;
-  }
-
-  public double get_phero_fresh( int x, int y ) {
-    return board[x][y].phero_fresh;
-  }
-
-  public double get_phero_old( int x, int y ) {
-    return board[x][y].phero_old;
+    board_proto.set_block( x_min, y_min, x_max, y_max, value );
   }
 
   public void age_phero( int time ) {
     double time_factor = (double) best_time / time;
     if ( time < best_time )
       best_time = time;
-    for( field[] fs : board )
-      for( field f : fs ) {
-        f.phero_old *= constant.PHERO_DISP_RATE;
-        f.phero_old += time_factor * f.phero_fresh;
-        if ( f.phero_old > 1 ) // clamp
-          f.phero_old = 1;
-        f.phero_fresh = 0;
+    for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+      double[] pho_x = phero_old[x], phf_x = phero_fresh[x];
+      for( int y = 0, y_max = board_proto.size_x; y < y_max; y++ ) {
+        pho_x[y] = ( pho_x[y] * constant.PHERO_DISP_RATE + time_factor * phf_x[y] );
+        if ( pho_x[y] > 1 ) // clamp
+          pho_x[y] = 1;
+        phf_x[y] = 0;
       }
+    }
   }
 
   public void add_phero( ant a ) {
@@ -183,12 +241,16 @@ public class AntBoard {
         double dist_sq = dx_sq + dy * dy;
         if ( dist_sq >= PHERO_SPREAD_RADIUS_SQ )
           continue;
-        field f = board[i_x][i_y];
-        if ( f.block )
+        if ( board_proto.block[i_x][i_y] )
           continue;
-        f.phero_fresh += a.my_genome.phero.epsilon( 1 - Math.sqrt( dist_sq ) * PHERO_SPREAD_RADIUS_INV ) * ( 1 - f.phero_fresh );
+        phero_fresh[i_x][i_y] += a.my_genome.phero.epsilon( 1 - Math.sqrt( dist_sq ) * PHERO_SPREAD_RADIUS_INV )
+                * ( 1 - phero_fresh[i_x][i_y] );
       }
     }
+  }
+
+  public int get_color( int x, int y ) {
+    return board_proto.block[x][y] ? Color.BLACK.getRGB() : new Color( 0, (float) phero_old[x][y], (float) phero_fresh[x][y] ).getRGB();
   }
 
   protected void reverse_path() {
@@ -208,7 +270,11 @@ public class AntBoard {
   }
 
   @SuppressWarnings( "empty-statement" )
-  public int run_iterations( int count, genome g ) {
+  public int run_iterations( int count, genome g, boolean bidi ) {
+    start_x = board_proto.start_x;
+    start_y = board_proto.start_y;
+    exit_x = board_proto.exit_x;
+    exit_y = board_proto.exit_y;
     int angle = 0; // var
     int angle2 = ( angle + 8 ) % ANGLE_STEPS;
     int it_total = 0;
@@ -245,6 +311,10 @@ public class AntBoard {
       ao.init( this );
     }
 
+    protected AntBoard get_board() {
+      return AntBoard.this;
+    }
+
     protected boolean step() {
       boolean ret = step_internal();
       ao.step( this );
@@ -260,8 +330,7 @@ public class AntBoard {
           values[i] = 0;
           continue;
         }
-        field f = board[x][y];
-        if ( f.block ) {
+        if ( board_proto.block[x][y] ) {
           values[i] = 0;
           continue;
         }
@@ -287,15 +356,15 @@ public class AntBoard {
         double base_weight
                 = my_genome.chaos.epsilon( RNG.nextFloat() )
                 + my_genome.smell.epsilon( 1.0 - PI_INV * Math.acos( cos_alpha ) )
-                + my_genome.taste.epsilon( f.phero_old )
-                - my_genome.aggro.epsilon( f.phero_fresh )
+                + my_genome.taste.epsilon( phero_old[x][y] )
+                - my_genome.aggro.epsilon( phero_fresh[x][y] )
                 - my_genome.agility.epsilon( ANGLE_RATE[i_ang] );
 
         values[i] = ( base_weight < RELATIVELY_BLOCKED_WEIGHT ) ? RELATIVELY_BLOCKED_WEIGHT : base_weight;
         sum_value += values[i];
       }
       if ( sum_value < RELATIVELY_BLOCKED_WEIGHT )
-        throw new RuntimeException( "ant blocked!" );
+        throw new AntException( "ant blocked!" );
       double pick = RNG.nextFloat() * sum_value;
       int i = 0;
       for( ; i < ANGLE_STEPS && pick >= values[i]; i++ )
