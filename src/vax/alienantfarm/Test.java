@@ -1,27 +1,25 @@
 package vax.alienantfarm;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.TreeSet;
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.FlowLayout;
+import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.awt.Color;
-import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.TreeSet;
 import javax.swing.JFrame;
 
-import vax.sqvaardcraft.ui.SC_Image;
 import static vax.alienantfarm.AntBoard.genome;
+import vax.sqvaardcraft.ui.SC_Image;
 
 /**
 
  @author toor
  */
 public class Test {
-  final static protected int //
-          MAX_SIZE = constant.STRIDE * 50,
-          ITERATIONS = 5;
-
   // general note on iterations:
   // 100 iterations: order-of-magnitude estimate only
   // 1000 iterations: approx +/- 10% of the real average
@@ -131,7 +129,61 @@ public class Test {
 
   }
 
-  static public class BufferedImageAntObserver implements AntObserver {
+  static public class FastBufferedImageAntObserver implements AntObserver {
+    protected BufferedImage bi;
+    protected int size_x, size_y;
+    protected int last_x, last_y;
+    protected int delay;
+    protected SC_Image parent;
+
+    public FastBufferedImageAntObserver( int size_x, int size_y, int delay, SC_Image parent ) {
+      this.size_x = size_x;
+      this.size_y = size_y;
+      this.delay = delay;
+      this.parent = parent;
+    }
+
+    public BufferedImage getBufferedImage() {
+      return bi;
+    }
+
+    @Override
+    public void init( AntBoard.ant a ) {
+      bi = new BufferedImage( size_x, size_y, BufferedImage.TYPE_INT_ARGB );
+      AntBoard ab = a.get_board();
+      for( int x = 0; x < size_x; x++ )
+        for( int y = 0; y < size_y; y++ )
+          bi.setRGB( x, y, ab.get_color( x, y ) );
+      if ( parent != null ) {
+        parent.set_image( bi );
+        parent.repaint();
+      }
+    }
+
+    @Override
+    public void step( AntBoard.ant a ) {
+    }
+
+    @Override
+    public void finish( AntBoard.ant a ) {
+      System.out.println( "success @ " + a.age );
+      AntBoard ab = a.get_board();
+      for( int x = 0; x < size_x; x++ )
+        for( int y = 0; y < size_y; y++ )
+          bi.setRGB( x, y, ab.get_color( x, y ) );
+      if ( parent != null ) {
+        parent.set_image( bi );
+        parent.repaint();
+      }
+      if ( delay > 0 )
+        try {
+          Thread.sleep( delay );
+        } catch (InterruptedException ex) {
+        }
+    }
+  }
+
+  static public class SlowBufferedImageAntObserver implements AntObserver {
     final static int ANT_COLOR = Color.RED.getRGB(),
             BOARD_COLOR = Color.BLACK.getRGB(),//Color.WHITE.getRGB(),
             BLOCK_COLOR = Color.WHITE.getRGB(),//Color.BLACK.getRGB(),
@@ -143,7 +195,7 @@ public class Test {
     protected int delay, big_iteration_delay;
     protected SC_Image parent;
 
-    public BufferedImageAntObserver( int size_x, int size_y, int delay, int finish_delay, SC_Image parent ) {
+    public SlowBufferedImageAntObserver( int size_x, int size_y, int delay, int finish_delay, SC_Image parent ) {
       this.size_x = size_x;
       this.size_y = size_y;
       this.delay = delay;
@@ -166,10 +218,11 @@ public class Test {
         parent.set_image( bi );
         parent.repaint();
       }
-      try {
-        Thread.sleep( big_iteration_delay );
-      } catch (InterruptedException ex) {
-      }
+      if ( big_iteration_delay > 0 )
+        try {
+          Thread.sleep( big_iteration_delay );
+        } catch (InterruptedException ex) {
+        }
 
       for( int x = 0; x < size_x; x++ ) {
         boolean[] abbpb_x = ab.board_proto.block[x];
@@ -195,7 +248,8 @@ public class Test {
         bi.setRGB( last_x, last_y, ANT_COLOR );
         if ( parent != null )
           parent.repaint();
-        Thread.sleep( delay );
+        if ( delay > 0 )
+          Thread.sleep( delay );
       } catch (Exception ex) {
         System.out.println( ex );
       }
@@ -212,17 +266,19 @@ public class Test {
         parent.set_image( bi );
         parent.repaint();
       }
-      try {
-        Thread.sleep( big_iteration_delay );
-      } catch (InterruptedException ex) {
-      }
+      if ( big_iteration_delay > 0 )
+        try {
+          Thread.sleep( big_iteration_delay );
+        } catch (InterruptedException ex) {
+        }
     }
   }
 
-  static public void display_genome_test( genome g, AntBoard.proto abp, int iterations, int delay, int big_iteration_delay ) {
-    JFrame jf = new JFrame();
-    SC_Image img = new SC_Image( MAX_SIZE, MAX_SIZE );
-    BufferedImageAntObserver biao = new BufferedImageAntObserver( MAX_SIZE, MAX_SIZE, delay, big_iteration_delay, img );
+  static protected void prepare_test_display( genome g, AntBoard.proto abp, int iterations, SC_Image img, AntObserver biao ) {
+    JFrame jf = new JFrame( "AlienAntFarm" );
+    Container cp = jf.getContentPane();
+    cp.setBackground( new Color( 0.1f, 0.1f, 0.1f ) );
+    cp.setLayout( new FlowLayout() );
     jf.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
     jf.add( img );
     jf.pack();
@@ -232,6 +288,18 @@ public class Test {
 
     System.out.println( g );
     ab.run_iterations( iterations, g, true );
+  }
+
+  static public void display_genome_test( genome g, AntBoard.proto abp, int iterations, int delay, int big_iteration_delay ) {
+    SC_Image img = new SC_Image( abp.size_x, abp.size_y );
+    AntObserver biao = new SlowBufferedImageAntObserver( abp.size_x, abp.size_y, delay, big_iteration_delay, img );
+    prepare_test_display( g, abp, iterations, img, biao );
+  }
+
+  static public void display_fast_genome_test( genome g, AntBoard.proto abp, int iterations, int delay ) {
+    SC_Image img = new SC_Image( abp.size_x, abp.size_y );
+    AntObserver biao = new FastBufferedImageAntObserver( abp.size_x, abp.size_y, delay, img );
+    prepare_test_display( g, abp, iterations, img, biao );
   }
 
   protected static class genome_rater implements Comparable<genome_rater> {
@@ -320,6 +388,10 @@ public class Test {
   }
 
   static public void test() throws IOException {
+    int //
+            SIZE_X = 1000,//constant.STRIDE * 50,
+            SIZE_Y = 760,//constant.STRIDE * 50,
+            MID_Y = SIZE_Y / 2;
     ArrayList<genome> alg = new ArrayList<>();
     try (FileInputStream fis = new FileInputStream( "genes.aaf" )) {
       genome g = genome.factory( fis );
@@ -330,9 +402,9 @@ public class Test {
     }
 
     AntBoard.proto //
-            p1 = new AntBoard.proto( MAX_SIZE, MAX_SIZE, MAX_SIZE - 1, MAX_SIZE / 2, 0, MAX_SIZE / 2 ),
-            p2 = new AntBoard.proto( MAX_SIZE, MAX_SIZE, MAX_SIZE - 1, MAX_SIZE / 2, 0, MAX_SIZE / 2 ),
-            p3 = new AntBoard.proto( MAX_SIZE, MAX_SIZE, MAX_SIZE - 1, MAX_SIZE / 2, 0, MAX_SIZE / 2 );
+            p1 = new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y ),
+            p2 = new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y ),
+            p3 = new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y );
 
     p2.set_block( 300, 100, 400, 600, true );
     p2.set_block( 100, 300, 600, 400, true );
@@ -343,7 +415,8 @@ public class Test {
     //primordial_soup( p3, 100, 10, 100, 10000 );
     //for( genome abg : alg )
     //  rate_genome( abg, p3, 100, 10000 );
-    display_genome_test( alg.get( 0 ), p3, 100, 10, 2000 );
+    //display_genome_test( alg.get( 0 ), p1, 100, 10, 2000 );
+    display_fast_genome_test( alg.get( 0 ), p3, 100, 0 );
     //rate_genome( alg.get( 0 ), p3, 100, 10000 );
     //rate_genome( alg.get( 6 ), p3, 100, 10000 );
     //rate_genome( alg.get( 7 ), p3, 100, 10000 );
@@ -364,9 +437,9 @@ public class Test {
      }
      }, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE );
      */
+    System.out.println( "all test tasks finished!" );
   }
 
   private Test() {
   }
-
 }
