@@ -1,12 +1,13 @@
 package vax.alienantfarm;
 
-import java.awt.Color;
-import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.TreeSet;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.TreeSet;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
 import javax.swing.JFrame;
 
 import vax.sqvaardcraft.ui.SC_Image;
@@ -29,10 +30,13 @@ public class Test {
     protected class result {
       public int it_start_sum, it_sum, it_end_sum;
 
-      public void reset() {
-        it_start_sum = 0;
-        it_sum = 0;
-        it_end_sum = 0;
+      protected result() {
+      }
+
+      protected result( int it_start_sum, int it_sum, int it_end_sum ) {
+        this.it_start_sum = it_start_sum;
+        this.it_sum = it_sum;
+        this.it_end_sum = it_end_sum;
       }
 
       public double r_start() {
@@ -47,6 +51,7 @@ public class Test {
         return (double) it_end_sum / edge_i;
       }
     }
+
     protected int i, i_max, edge_i, edge_up, hard_limit;
     protected result r = new result();
 
@@ -55,6 +60,25 @@ public class Test {
       this.edge_i = edge_i;
       edge_up = 2 * i_max - edge_i;
       this.hard_limit = hard_limit;
+    }
+
+    public void setResultFailure() {
+      r = new result() {
+        @Override
+        public double r_start() {
+          return Double.POSITIVE_INFINITY;
+        }
+
+        @Override
+        public double r_avg() {
+          return Double.POSITIVE_INFINITY;
+        }
+
+        @Override
+        public double r_end() {
+          return Double.POSITIVE_INFINITY;
+        }
+      };
     }
 
     @Override
@@ -75,6 +99,15 @@ public class Test {
         r.it_end_sum += a.age;
       r.it_sum += a.age;
       i++;
+    }
+
+    @Override
+    public String toString() {
+      return "# Iterations: " + i_max
+              + "\n# rating START = " + r.r_start()
+              + "\n# rating AVG = " + r.r_avg()
+              + "\n# rating END = " + r.r_end()
+              + "\n";
     }
   }
 
@@ -230,13 +263,8 @@ public class Test {
       CounterAntObserver cao = new MeasuringAntObserver( iterations, iterations / 5, hard_limit, ps );
       AntBoard ab = new AntBoard( abp, cao );
       ab.run_iterations( iterations, g, true );
-      System.out.println( "# Iterations: " + iterations
-              + "\n# rating START = " + cao.r.r_start()
-              + "\n# rating AVG = " + cao.r.r_avg()
-              + "\n# rating END = " + cao.r.r_end()
-              + "\n" );
+      System.out.println( cao );
       return cao.r;
-
     } catch (AntException ex) {
       System.out.println( ex );
       return null;
@@ -252,49 +280,54 @@ public class Test {
     try {
       ab.run_iterations( iterations, g, true );
     } catch (AntException ex) {
+      cao.setResultFailure();
       System.out.println( ex );
+      return null;
     }
-    System.out.println( "# Iterations: " + iterations
-            + "\n# rating START = " + cao.r.r_start()
-            + "\n# rating AVG = " + cao.r.r_avg()
-            + "\n# rating END = " + cao.r.r_end()
-            + "\n" );
+    System.out.println( cao );
     return cao.r;
   }
 
-  static public void test2() {
-    AntBoard.proto p1 = new AntBoard.proto( MAX_SIZE, MAX_SIZE, MAX_SIZE - 1, MAX_SIZE / 2, 0, MAX_SIZE / 2 );
+  static protected void soup_output( String type, TreeSet<genome_rater> tsgr, int target_count, PrintStream ps ) {
+    ps.println( "### best " + type + " ###" );
+    Iterator<genome_rater> it = tsgr.iterator();
+    if ( !it.hasNext() )
+      throw new RuntimeException( "empty TreeSet provided!" );
+    genome_rater gr = it.next();
+    for( int i = 0; i < target_count && gr != null; gr = it.hasNext() ? it.next() : null, i++ )
+      ps.println( gr.g.toOutputString() + "# rating: " + gr.rating );
+  }
 
-    p1.set_block( 300, 100, 400, 600, true );
-    p1.set_block( 100, 300, 600, 400, true );
-    /*
-     genome g_pheroless = new genome(
-     new Gene( 1, 0 ), new Gene( 1, 0 ), Gene.NULL_GENE,
-     Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE );
-     genome g_pheroagg = new genome(
-     new Gene( 1, 0 ), new Gene( 1, 0 ), Gene.NULL_GENE,
-     new Gene( 1, 0 ), Gene.NULL_GENE, new Gene( 1, 0 ) );
-     */
-    //genome g = g_pheroagg;
-    //genome g = g_pheroless;
-    //genome g = new genome( new Gene( 1, 0 ), Gene.NULL_GENE, new Gene( 1, 0 ), new Gene( 1, 0 ), new Gene( 1, 0 ), new Gene( 1, 0 ) );
+  static public void primordial_soup( AntBoard.proto abp, int genome_count, int target_count, int iterations, int hard_limit ) {
     TreeSet<genome_rater> start = new TreeSet<>(), avg = new TreeSet<>(), end = new TreeSet<>();
-    for( int i = 0; i < 100; i++ ) {
+    for( int i = 0; i < genome_count; i++ ) {
       genome g = new genome();
-      CounterAntObserver.result caor = rate_genome( g, p1, ITERATIONS, MAX_SIZE * MAX_SIZE );
-      start.add( new genome_rater( g, caor.r_start() ) );
-      avg.add( new genome_rater( g, caor.r_avg() ) );
-      end.add( new genome_rater( g, caor.r_end() ) );
+      CounterAntObserver.result caor = rate_genome( g, abp, iterations, hard_limit );
+      if ( caor != null ) {
+        start.add( new genome_rater( g, caor.r_start() ) );
+        avg.add( new genome_rater( g, caor.r_avg() ) );
+        end.add( new genome_rater( g, caor.r_end() ) );
+      }
     }
-    System.out.println( "start:\n" + start.first() + "avg:\n" + avg.first() + "end:\n" + end.first() );
+    System.out.println( "=== HALL OF FAME ===\nstart:\n" + start.first() + "avg:\n" + avg.first() + "end:\n" + end.first() );
+    try (PrintStream ps = new PrintStream( "genome_soup.aaf" )) {
+      soup_output( "START", start, target_count, ps );
+      soup_output( "AVG", avg, target_count, ps );
+      soup_output( "END", end, target_count, ps );
+    } catch (IOException ex) {
+      System.out.println( ex );
+    }
   }
 
   static public void test() throws IOException {
-    FileInputStream fis = new FileInputStream( "genes.aaf" );
     ArrayList<genome> alg = new ArrayList<>();
-    int genome_count = 6;
-    for( int i = 0; i < genome_count; i++ )
-      alg.add( new genome( fis ) );
+    try (FileInputStream fis = new FileInputStream( "genes.aaf" )) {
+      genome g = genome.factory( fis );
+      while( g != null ) {
+        alg.add( g );
+        g = genome.factory( fis );
+      }
+    }
 
     AntBoard.proto //
             p1 = new AntBoard.proto( MAX_SIZE, MAX_SIZE, MAX_SIZE - 1, MAX_SIZE / 2, 0, MAX_SIZE / 2 ),
@@ -307,25 +340,30 @@ public class Test {
     p3.set_block( 100, 100, 600, 200, true );
     p3.set_block( 300, 100, 400, 600, true );
 
+    //primordial_soup( p3, 100, 10, 100, 10000 );
     //for( genome abg : alg )
-    //  rate_genome( abg, p3, 10, MAX_SIZE * 100 );
+    //  rate_genome( abg, p3, 100, 10000 );
+    display_genome_test( alg.get( 0 ), p3, 100, 10, 2000 );
+    //rate_genome( alg.get( 0 ), p3, 100, 10000 );
+    //rate_genome( alg.get( 6 ), p3, 100, 10000 );
+    //rate_genome( alg.get( 7 ), p3, 100, 10000 );
     //measure_genome( alg.get( 0 ), p3, 1000, MAX_SIZE * MAX_SIZE );
-    display_genome_test( alg.get( 0 ), p3, ITERATIONS * 10, 5, 3000 );
+//    display_genome_test( alg.get( 0 ), p3, ITERATIONS * 10, 5, 3000 );
     //if ( true )
 //      return;
-    genome g_hard = new genome( new Gene( 1.0, 1.0 ) {
-      @Override
-      public double epsilon( double x ) {
-        return x * x * x;
-      }
-    }, new Gene( 1.0, 1.0 ) {
-      @Override
-      public double epsilon( double x ) {
-        return x * x * x;
-      }
-    }, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE );
-
-    //display_genome_test( alg.get( 4 ), p3, ITERATIONS, 10, 2000 );
+    /*
+     genome g_hard = new genome( new Gene( 1.0, 1.0 ) {
+     @Override
+     public double epsilon( double x ) {
+     return x * x * x;
+     }
+     }, new Gene( 1.0, 1.0 ) {
+     @Override
+     public double epsilon( double x ) {
+     return x * x * x;
+     }
+     }, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE );
+     */
   }
 
   private Test() {
