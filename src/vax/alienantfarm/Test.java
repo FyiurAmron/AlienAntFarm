@@ -474,7 +474,7 @@ public class Test {
         break;
     }
 
-    System.out.println( "all test test tasks finished!" );
+    System.out.println( "all test tasks finished!" );
   }
 
   private Test() {
