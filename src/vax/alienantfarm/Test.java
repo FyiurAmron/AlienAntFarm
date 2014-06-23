@@ -3,6 +3,8 @@ package vax.alienantfarm;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.FlowLayout;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -195,12 +197,31 @@ public class Test {
     protected int delay, big_iteration_delay;
     protected SC_Image parent;
 
-    public SlowBufferedImageAntObserver( int size_x, int size_y, int delay, int finish_delay, SC_Image parent ) {
+    public SlowBufferedImageAntObserver( int size_x, int size_y, int delay, int finish_delay, SC_Image parent, AntBoard.proto abp ) {
       this.size_x = size_x;
       this.size_y = size_y;
       this.delay = delay;
       this.big_iteration_delay = finish_delay;
       this.parent = parent;
+      if ( parent != null )
+        parent.addMouseListener( new MouseAdapter() {
+          @Override
+          public void mousePressed( MouseEvent e ) {
+            int x = e.getX(), y = e.getY(), offset = constant.STRIDE * 2,
+                    x1 = ( x > offset ) ? x - offset : 0, y1 = ( y > offset ) ? y - offset : 0,
+                    x2 = x + offset, y2 = y + offset;
+            if ( x2 >= size_x )
+              x2 = size_x - 1;
+            if ( y2 >= size_y )
+              y2 = size_y - 1;
+            abp.set_block( x1, y1, x2, y2, e.getButton() == 1 );
+          }
+
+          @Override
+          public void mouseDragged( MouseEvent e ) {
+            mousePressed( e );
+          }
+        } );
     }
 
     public BufferedImage getBufferedImage() {
@@ -223,12 +244,13 @@ public class Test {
           Thread.sleep( big_iteration_delay );
         } catch (InterruptedException ex) {
         }
-
-      for( int x = 0; x < size_x; x++ ) {
-        boolean[] abbpb_x = ab.board_proto.block[x];
-        for( int y = 0; y < size_y; y++ )
-          bi.setRGB( x, y, abbpb_x[y] ? BLOCK_COLOR : BOARD_COLOR );
-      }
+      /*
+       for( int x = 0; x < size_x; x++ ) {
+       boolean[] abbpb_x = ab.board_proto.block[x];
+       for( int y = 0; y < size_y; y++ )
+       bi.setRGB( x, y, abbpb_x[y] ? BLOCK_COLOR : BOARD_COLOR );
+       }
+       */
       bi.setRGB( ab.exit_x, ab.exit_y, SPECIAL_COLOR );
       last_x = a.pos_x;
       last_y = a.pos_y;
@@ -292,7 +314,7 @@ public class Test {
 
   static public void display_genome_test( genome g, AntBoard.proto abp, int iterations, int delay, int big_iteration_delay ) {
     SC_Image img = new SC_Image( abp.size_x, abp.size_y );
-    AntObserver biao = new SlowBufferedImageAntObserver( abp.size_x, abp.size_y, delay, big_iteration_delay, img );
+    AntObserver biao = new SlowBufferedImageAntObserver( abp.size_x, abp.size_y, delay, big_iteration_delay, img, abp );
     prepare_test_display( g, abp, iterations, img, biao );
   }
 
@@ -387,7 +409,7 @@ public class Test {
     }
   }
 
-  static public void test() throws IOException {
+  static public void test( int mode, int board, int g_nr ) throws IOException {
     int //
             SIZE_X = 1000,//constant.STRIDE * 50,
             SIZE_Y = 760,//constant.STRIDE * 50,
@@ -401,29 +423,18 @@ public class Test {
       }
     }
 
-    AntBoard.proto //
-            p1 = new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y ),
-            p2 = new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y ),
-            p3 = new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y );
+    AntBoard.proto p[] = {
+      new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y ),
+      new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y ),
+      new AntBoard.proto( SIZE_X, SIZE_Y, SIZE_X - 1, MID_Y, 0, MID_Y )
+    };
 
-    p2.set_block( 300, 100, 400, 600, true );
-    p2.set_block( 100, 300, 600, 400, true );
-    p3.set_block( 100, 500, 600, 600, true );
-    p3.set_block( 100, 100, 600, 200, true );
-    p3.set_block( 300, 100, 400, 600, true );
+    p[1].set_block( 300, 100, 400, 600, true );
+    p[1].set_block( 100, 300, 600, 400, true );
+    p[2].set_block( 100, 500, 600, 600, true );
+    p[2].set_block( 100, 100, 600, 200, true );
+    p[2].set_block( 300, 100, 400, 600, true );
 
-    //primordial_soup( p3, 100, 10, 100, 10000 );
-    //for( genome abg : alg )
-    //  rate_genome( abg, p3, 100, 10000 );
-    //display_genome_test( alg.get( 0 ), p1, 100, 10, 2000 );
-    display_fast_genome_test( alg.get( 0 ), p3, 100, 0 );
-    //rate_genome( alg.get( 0 ), p3, 100, 10000 );
-    //rate_genome( alg.get( 6 ), p3, 100, 10000 );
-    //rate_genome( alg.get( 7 ), p3, 100, 10000 );
-    //measure_genome( alg.get( 0 ), p3, 1000, MAX_SIZE * MAX_SIZE );
-//    display_genome_test( alg.get( 0 ), p3, ITERATIONS * 10, 5, 3000 );
-    //if ( true )
-//      return;
     /*
      genome g_hard = new genome( new Gene( 1.0, 1.0 ) {
      @Override
@@ -436,8 +447,34 @@ public class Test {
      return x * x * x;
      }
      }, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE, Gene.NULL_GENE );
+
      */
-    System.out.println( "all test tasks finished!" );
+    //
+    genome g = alg.get( g_nr );
+    AntBoard.proto abp = p[board];
+    switch ( mode ) {
+      case 0:
+        display_genome_test( g, abp, 100, 5, 3000 );
+        break;
+      case 1:
+        display_fast_genome_test( g, abp, 100, 0 );
+        break;
+      case 2:
+        measure_genome( g, abp, 1000, SIZE_X * SIZE_Y );
+        break;
+      case 3:
+        rate_genome( g, abp, 100, 10000 );
+        break;
+      case 4:
+        for( genome abg : alg )
+          rate_genome( abg, abp, 100, 10000 );
+        break;
+      case 5:
+        primordial_soup( abp, 100, 10, 100, 10000 );
+        break;
+    }
+
+    System.out.println( "all test test tasks finished!" );
   }
 
   private Test() {
