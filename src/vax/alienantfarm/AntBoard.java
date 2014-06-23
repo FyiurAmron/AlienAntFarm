@@ -252,7 +252,7 @@ public class AntBoard {
     }
 
     double phero_base = a.my_genome.phero.base, phero_a = 1.0 + 1.0 / ( phero_base - 1 );
-    if ( time_factor < TIME_AMP_THRESHOLD ) {
+    if ( time_factor < TIME_AMP_THRESHOLD ) { // slow (bad) solution
       for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
         double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
         for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
@@ -264,11 +264,27 @@ public class AntBoard {
       }
       return;
     }
-    if ( time_factor > 1 ) {
+    if ( time_factor <= 1 ) { // medium (mediocre) solution; time_factor in (TIME_AMP_THRESHOLD,1), no clamping needed
       for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
         double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
         for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
-          pho_x[y] *= constant.PHERO_DISP_RATE_REDUCED;
+          pho_x[y] *= constant.PHERO_DISP_RATE;
+          phb_x[y] *= constant.PHERO_DISP_RATE_REDUCED;
+          if ( phf_x[y] <= phero_base ) {
+            pho_x[y] += time_factor * phf_x[y] * ( 1 - pho_x[y] );
+          } else {
+            double gradient = phf_x[y] - 1;
+            pho_x[y] += time_factor * phero_a * gradient * ( 1 - pho_x[y] );
+            phb_x[y] -= ( phero_a * gradient - phf_x[y] ) * ( 1 - phb_x[y] );
+          }
+          phf_x[y] = 0;
+        }
+      }
+    } else // fast (good) solution
+      for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
+        double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
+        for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
+          pho_x[y] *= constant.PHERO_DISP_RATE;
           phb_x[y] *= constant.PHERO_DISP_RATE;
           if ( phf_x[y] <= phero_base ) {
             pho_x[y] += time_factor * phf_x[y] * ( 1 - pho_x[y] );
@@ -279,22 +295,6 @@ public class AntBoard {
           }
           if ( pho_x[y] > 1 ) // clamp
             pho_x[y] = 1;
-          phf_x[y] = 0;
-        }
-      }
-    } else // time_factor in (TIME_AMP_THRESHOLD,1), no clamping needed
-      for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
-        double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
-        for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
-          pho_x[y] *= constant.PHERO_DISP_RATE_REDUCED;
-          phb_x[y] *= constant.PHERO_DISP_RATE;
-          if ( phf_x[y] <= phero_base ) {
-            pho_x[y] += time_factor * phf_x[y] * ( 1 - pho_x[y] );
-          } else {
-            double gradient = phf_x[y] - 1;
-            pho_x[y] += time_factor * phero_a * gradient * ( 1 - pho_x[y] );
-            phb_x[y] -= ( phero_a * gradient - phf_x[y] ) * ( 1 - phb_x[y] );
-          }
           phf_x[y] = 0;
         }
       }
@@ -339,8 +339,8 @@ public class AntBoard {
   }
 
   public int get_color( int x, int y ) {
-      return board_proto.block[x][y] ? Color.WHITE.getRGB()
-              : new Color( (float) phero_bad[x][y], (float) phero_old[x][y], (float) phero_fresh[x][y] ).getRGB();
+    return board_proto.block[x][y] ? Color.WHITE.getRGB()
+            : new Color( (float) phero_bad[x][y], (float) phero_old[x][y], (float) phero_fresh[x][y] ).getRGB();
   }
 
   protected void reverse_path() {
