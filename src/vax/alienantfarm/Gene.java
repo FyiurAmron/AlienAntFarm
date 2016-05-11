@@ -1,7 +1,7 @@
 package vax.alienantfarm;
 
 import java.util.Random;
-import static vax.alienantfarm.constant.*;
+import static vax.alienantfarm.Constant.*;
 
 /**
  Immutable. Create new instance if a derived gene is needed.
