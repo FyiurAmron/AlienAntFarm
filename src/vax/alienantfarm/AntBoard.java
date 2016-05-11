@@ -6,8 +6,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.awt.Color;
 
-import static vax.alienantfarm.constant.*;
-import static vax.alienantfarm.util.in_range;
+import static vax.alienantfarm.Constant.*;
+import static vax.alienantfarm.Util.in_range;
 
 /**
 
@@ -87,9 +87,9 @@ public class AntBoard {
           break;
         }
         while( is.read() != '(' );
-        d1 = util.get_double( is );
+        d1 = Util.get_double( is );
         //while( br.read() != ',' ); // already read by get_double()
-        d2 = util.get_double( is );
+        d2 = Util.get_double( is );
         while( is.read() != '\n' );
         Gene g = new Gene( d1, d2 );
         switch ( new String( char_buf ) ) {
@@ -210,7 +210,7 @@ public class AntBoard {
     phero_old = new double[size_x][size_y];
     phero_bad = new double[size_x][size_y];
     this.ao = ao;
-    //base_dist = util.dist( exit_x - start_x, exit_y - start_y );
+    //base_dist = Util.dist( exit_x - start_x, exit_y - start_y );
   }
 
   public void set_block( int x_min, int y_min, int x_max, int y_max, boolean value ) {
@@ -256,7 +256,7 @@ public class AntBoard {
       for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
         double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
         for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
-          pho_x[y] *= constant.PHERO_DISP_RATE_REDUCED;
+          pho_x[y] *= Constant.PHERO_DISP_RATE_REDUCED;
           if ( phf_x[y] > phero_base )
             phb_x[y] -= ( phero_a * ( phf_x[y] - 1 ) - phf_x[y] ) * ( 1 - phb_x[y] );
           phf_x[y] = 0;
@@ -268,8 +268,8 @@ public class AntBoard {
       for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
         double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
         for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
-          pho_x[y] *= constant.PHERO_DISP_RATE;
-          phb_x[y] *= constant.PHERO_DISP_RATE_REDUCED;
+          pho_x[y] *= Constant.PHERO_DISP_RATE;
+          phb_x[y] *= Constant.PHERO_DISP_RATE_REDUCED;
           if ( phf_x[y] <= phero_base ) {
             pho_x[y] += time_factor * phf_x[y] * ( 1 - pho_x[y] );
           } else {
@@ -284,8 +284,8 @@ public class AntBoard {
       for( int x = 0, x_max = board_proto.size_x; x < x_max; x++ ) {
         double[] pho_x = phero_old[x], phf_x = phero_fresh[x], phb_x = phero_bad[x];
         for( int y = 0, y_max = board_proto.size_y; y < y_max; y++ ) {
-          pho_x[y] *= constant.PHERO_DISP_RATE;
-          phb_x[y] *= constant.PHERO_DISP_RATE;
+          pho_x[y] *= Constant.PHERO_DISP_RATE;
+          phb_x[y] *= Constant.PHERO_DISP_RATE;
           if ( phf_x[y] <= phero_base ) {
             pho_x[y] += time_factor * phf_x[y] * ( 1 - pho_x[y] );
           } else {
@@ -424,7 +424,7 @@ public class AntBoard {
           continue;
         }
         double dx = exit_x - x, dy = exit_y - y;
-        double dist = util.dist( dx, dy );
+        double dist = Util.dist( dx, dy );
         if ( dist <= DIST_THRESHOLD ) {
           pos_x = exit_x;
           pos_y = exit_y;
@@ -436,7 +436,7 @@ public class AntBoard {
           return false;
         }
 
-        double cos_alpha = util.dot( x_ang, y_ang, dx, dy ) / ( STRIDE * dist );
+        double cos_alpha = Util.dot( x_ang, y_ang, dx, dy ) / ( STRIDE * dist );
         if ( cos_alpha > 1 )
           cos_alpha = 1;
         else if ( cos_alpha < -1 )

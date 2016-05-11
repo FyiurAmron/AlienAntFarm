@@ -7,7 +7,7 @@ import java.io.InputStream;
 
  @author toor
  */
-public class util {
+public class Util {
   static public double fast_pow( final double a, final double b ) {
     return Double.longBitsToDouble(
             (long) ( b * ( Double.doubleToLongBits( a ) - 4606921280493453312L ) ) + 4606921280493453312L );
@@ -73,7 +73,7 @@ public class util {
     return new String( buf );
   }
 
-  private util() {
+  private Util() {
   }
 
 }

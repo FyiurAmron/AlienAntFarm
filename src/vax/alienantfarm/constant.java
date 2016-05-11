@@ -4,7 +4,7 @@ package vax.alienantfarm;
 
  @author toor
  */
-public interface constant {
+public interface Constant {
   double PI_INV = 1.0 / Math.PI;
   double E_INV = 1.0 / Math.E;
   int STRIDE = 14;

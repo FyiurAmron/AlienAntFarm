@@ -207,7 +207,7 @@ public class Test {
         parent.addMouseListener( new MouseAdapter() {
           @Override
           public void mousePressed( MouseEvent e ) {
-            int x = e.getX(), y = e.getY(), offset = constant.STRIDE * 2,
+            int x = e.getX(), y = e.getY(), offset = Constant.STRIDE * 2,
                     x1 = ( x > offset ) ? x - offset : 0, y1 = ( y > offset ) ? y - offset : 0,
                     x2 = x + offset, y2 = y + offset;
             if ( x2 >= size_x )
